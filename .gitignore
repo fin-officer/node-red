@@ -1,4 +1,7 @@
 .idea
+.config.nodes.json
+.config.runtime.json
+.config.runtime.json.backup
 venv
 deployment_logs
 users.txt

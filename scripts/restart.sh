@@ -9,6 +9,13 @@ NC='\033[0m' # No Color
 
 echo -e "${BLUE}[INFO]${NC} Restartowanie projektu Email-LLM Integration..."
 
+# Załaduj zmienne środowiskowe
+if [ -f .env ]; then
+    source .env
+else
+    echo -e "${YELLOW}[UWAGA]${NC} Plik .env nie został znaleziony, używam domyślnych wartości."
+fi
+
 # Zatrzymaj kontenery
 ./scripts/stop.sh
 
