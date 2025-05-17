@@ -1,1 +1,10 @@
-# Zależności npm
+{
+    "name": "email-llm-integration",
+    "version": "0.1.0",
+    "description": "Integracja email z modelami LLM za pomocą Node-RED",
+    "dependencies": {
+        "node-red-node-sqlite": "latest",
+        "node-red-node-email": "latest",
+        "node-red-contrib-cron-plus": "latest"
+    }
+}

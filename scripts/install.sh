@@ -1,5 +1,5 @@
 #!/bin/bash
-# Skrypt instalacyjny dla Email-LLM Integration z Node-RED
+# Skrypt instalacyjny dla Email-LLM Integration z Node-RED (poprawiona wersja)
 
 # Kolory do komunikatów
 GREEN='\033[0;32m'
@@ -43,6 +43,15 @@ check_requirements() {
         error "Docker Compose nie jest zainstalowany. Zainstaluj Docker Compose przed kontynuowaniem."
     fi
 
+    # Sprawdź SQLite
+    if ! command -v sqlite3 &> /dev/null; then
+        warning "SQLite3 nie jest zainstalowany. Instalacja może być niepełna. Zalecane jest zainstalowanie sqlite3."
+        read -p "Czy chcesz kontynuować bez sqlite3? (t/n): " choice
+        if [[ "$choice" != "t" && "$choice" != "T" ]]; then
+            error "Instalacja przerwana. Zainstaluj sqlite3 przed kontynuowaniem."
+        fi
+    fi
+
     # Sprawdź curl
     if ! command -v curl &> /dev/null; then
         error "curl nie jest zainstalowany. Zainstaluj curl przed kontynuowaniem."
@@ -59,6 +68,9 @@ create_directory_structure() {
     mkdir -p data/sqlite
     mkdir -p scripts
 
+    # Ustaw odpowiednie uprawnienia
+    chmod -R 755 data
+
     success "Struktura katalogów została utworzona."
 }
 
@@ -69,14 +81,14 @@ initialize_sqlite_database() {
     # Utwórz katalog dla bazy danych, jeśli nie istnieje
     mkdir -p data/sqlite
 
-    # Sprawdź, czy baza danych już istnieje
+    # Sprawdź, czy baza danych już istnieje i usuń ją, jeśli tak
     if [ -f "data/sqlite/emails.db" ]; then
-        warning "Baza danych już istnieje. Tworzenie kopii zapasowej..."
-        cp data/sqlite/emails.db data/sqlite/emails.db.backup-$(date +%Y%m%d-%H%M%S)
+        warning "Baza danych już istnieje. Usuwanie istniejącej bazy danych..."
+        rm -f data/sqlite/emails.db
     fi
 
-    # Inicjalizuj bazę danych
-    sqlite3 data/sqlite/emails.db <<EOF
+    # Inicjalizuj bazę danych używając tymczasowego pliku SQL
+    cat > /tmp/init_db.sql <<EOF
 PRAGMA journal_mode=WAL;
 PRAGMA synchronous=NORMAL;
 PRAGMA cache_size=-102400;
@@ -117,6 +129,14 @@ CREATE TABLE IF NOT EXISTS email_attachments (
 
 VACUUM;
 EOF
+
+    # Uruchom sqlite3 z plikiem SQL
+    if ! sqlite3 data/sqlite/emails.db < /tmp/init_db.sql; then
+        error "Nie udało się zainicjalizować bazy danych SQLite. Sprawdź, czy sqlite3 jest zainstalowany poprawnie."
+    fi
+
+    # Usuń tymczasowy plik
+    rm -f /tmp/init_db.sql
 
     # Ustaw odpowiednie uprawnienia do bazy danych
     chmod 666 data/sqlite/emails.db
@@ -248,7 +268,7 @@ module.exports = {
 };
 EOF
 
-    # Ustaw uprawnienia dla plików Node-RED
+    # Ustaw odpowiednie uprawnienia dla plików Node-RED
     chmod -R 777 data/node-red
 
     success "Pliki konfiguracyjne Node-RED zostały utworzone."
