@@ -1,0 +1,2 @@
+# node-red
+Example integration
