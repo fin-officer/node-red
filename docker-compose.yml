@@ -1,33 +1,33 @@
 version: '3.8'
 
 services:
-  # Serwer Ollama z lokalnym LLM - zoptymalizowany
+  # Serwer Ollama z lokalnym LLM
   ollama:
-    build:
-      context: ./docker/ollama
-      dockerfile: Dockerfile
+    image: ollama/ollama:latest
     container_name: ollama
     ports:
       - "${OLLAMA_PORT:-11435}:11434"
     volumes:
       - ollama_models:/root/.ollama
     environment:
-      - MODEL=${OLLAMA_MODEL:-mistral}
+      - MODEL=${OLLAMA_MODEL:-phi3:mini}  # Używamy lekkiego modelu dla szybszego startu
     restart: unless-stopped
     networks:
       - app-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/health"]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 3
-      start_period: 15s
-    deploy:
-      resources:
-        limits:
-          memory: 6G  # Ogranicz pamięć, aby uniknąć przeładowania
-        reservations:
-          memory: 1G  # Zarezerwuj minimum pamięci dla kontenera
+      start_period: 20s
+    entrypoint: >
+      sh -c "ollama serve &
+             sleep 10 &&
+             if ! ollama list | grep -q $${MODEL}; then
+               echo 'Pobieranie modelu '$${MODEL}
+               ollama pull $${MODEL}
+             fi &&
+             wait"
 
   # Testowy serwer email (MailHog)
   mailserver:
@@ -39,13 +39,13 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-    # Na produkcji zastąpić rzeczywistym serwerem
 
-  # Node-RED do integracji
+  # Node-RED do integracji - zbudowany z preinstalowanymi modułami
   nodered:
-    image: nodered/node-red:latest
+    build:
+      context: ./node-red-custom
+      dockerfile: Dockerfile
     container_name: nodered-email-llm
-    user: "1000:1000"
     ports:
       - "${NODERED_PORT:-1880}:1880"
     volumes:
@@ -56,10 +56,10 @@ services:
       - NODE_RED_ENABLE_PROJECTS=false
       - NODE_RED_ENABLE_SAFE_MODE=false
       - NODE_OPTIONS=--max_old_space_size=512
-      - OLLAMA_HOST=${OLLAMA_HOST}
-      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-phi3:mini}
       - OLLAMA_API_KEY=${OLLAMA_API_KEY}
-      - SQLITE_DB_PATH=${SQLITE_DB_PATH}
+      - SQLITE_DB_PATH=${SQLITE_DB_PATH:-/data/sqlite/emails.db}
       - EMAIL_HOST=${EMAIL_HOST}
       - EMAIL_PORT=${EMAIL_PORT}
       - EMAIL_USER=${EMAIL_USER}
